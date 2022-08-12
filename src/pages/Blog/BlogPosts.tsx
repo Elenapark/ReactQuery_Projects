@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useQuery } from "react-query";
+import React, { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "react-query";
 import PostDetails from "./PostDetails";
 
 const MAX_PAGES = 10;
@@ -14,6 +14,21 @@ async function fetchPosts(page) {
 const BlogPosts = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedPost, setSelectedPost] = useState(null);
+
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (currentPage < MAX_PAGES) {
+      // 페이지네이션 작업 때마다 로딩 스피너가 보여 좋지 않은 사용자 경험을 유발
+      // 페이지가 바뀔 때마다 미리 다음 페이지를 받아와서 대기하고 있음
+      // useQuery에서 사용한 querykey를 그대로 사용
+      const nextPage = currentPage + 1;
+      queryClient.prefetchQuery(["posts", nextPage], () =>
+        fetchPosts(nextPage)
+      );
+    }
+  }, [currentPage, queryClient]);
+
   const { data, isLoading, isError, error } = useQuery(
     // 의존성배열처럼 사용
     // currentPage state가 바뀌면 쿼리 키가 바뀌므로 useQuery에 새로운 쿼리를 알려서 데이터를 다시 가져옴
@@ -21,6 +36,8 @@ const BlogPosts = () => {
     () => fetchPosts(currentPage),
     {
       staleTime: 2000,
+      // 쿼리 키가 변경되어도 이전 데이터를 유지, 이전 페이지로 돌아갔을 때 캐시 유지
+      keepPreviousData: true,
     }
   );
   // isFetching : the async query function hasn't yet resolved
